@@ -1,3 +1,5 @@
+from queue import Queue
+
 import pika
 import sys
 import re
@@ -25,6 +27,12 @@ status_codes = {
     "404": "Not found",
     "502": "Bad gateway"
 }
+
+# A queue that contains the last 10 logs.
+# Format: [ip, status_code] eg. [192.168.1.1, 404]
+# Usage: Compare the last 10 logs to determine if the traffic is a potential directory brute force attack
+# (Like GoBuster)).
+log_buffer = Queue(maxsize=10)
 
 connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
 channel = connection.channel()
@@ -54,11 +62,29 @@ def callback(ch, method, properties, body):
     message = body.decode().split(" ")
     ip, date, time, request, url = message[0], message[3][1:12], message[3][13:], message[5], message[6]
 
-    # [date & time] [status code & message] source IP | url & HTTP method
-    formatted_output = f"[{date} {time}] " \
-                       f"{code_color}[{code}: {status_codes[code].upper()}]" \
-                       f"{colors.ENDC} Source IP: {colors.HEADER}{colors.BOLD}{ip}{colors.ENDC} | " \
-                       f"Tried to access {colors.OKBLUE}\"{url}\"{colors.ENDC} ({request[1:]})"
+    # Remove last element if buffer is full
+    if log_buffer.full():
+        log_buffer.get()
+
+    # Add element to buffer
+    log_buffer.put([ip, code])
+    log_buffer.task_done()
+
+    # Check if all elements in log buffer is identical
+    if all(element == log_buffer.queue[0] for element in log_buffer.queue):
+        # Potential directory brute force attack detected!
+        # [date & time] [status code & message] source IP | url & HTTP method
+        formatted_output = f"[{date} {time}] " \
+                           f"{code_color}[{code}: {status_codes[code].upper()}]" \
+                           f"{colors.ENDC} Source IP: {colors.HEADER}{colors.BOLD}{ip}{colors.ENDC} | " \
+                           f"Tried to access {colors.OKBLUE}\"{url}\"{colors.ENDC} ({request[1:]}) " \
+                           f"{colors.FAIL}[Possible directory brute force attack!]{colors.ENDC}"
+    else:
+        # [date & time] [status code & message] source IP | url & HTTP method
+        formatted_output = f"[{date} {time}] " \
+                           f"{code_color}[{code}: {status_codes[code].upper()}]" \
+                           f"{colors.ENDC} Source IP: {colors.HEADER}{colors.BOLD}{ip}{colors.ENDC} | " \
+                           f"Tried to access {colors.OKBLUE}\"{url}\"{colors.ENDC} ({request[1:]})"
 
     # Print to terminal with colors
     print(formatted_output)
