@@ -62,25 +62,15 @@ def callback(ch, method, properties, body):
     message = body.decode().split(" ")
     ip, date, time, request, url = message[0], message[3][1:12], message[3][13:], message[5], message[6]
 
-    # Remove last element if buffer is full
-    if log_buffer.full():
-        log_buffer.get()
-
-    # Add element to buffer
-    log_buffer.put([ip, code])
-    log_buffer.task_done()
-
-    # Check if all elements in log buffer is identical
-    if all(element == log_buffer.queue[0] for element in log_buffer.queue):
-        # Potential directory brute force attack detected!
-        # [date & time] [status code & message] source IP | url & HTTP method
+    if is_directory_brute_force_attack(ip, code):
+        # [date time] [code] ip | url request [Possible directory brute force attack!]
         formatted_output = f"[{date} {time}] " \
                            f"{code_color}[{code}: {status_codes[code].upper()}]" \
                            f"{colors.ENDC} Source IP: {colors.HEADER}{colors.BOLD}{ip}{colors.ENDC} | " \
                            f"Tried to access {colors.OKBLUE}\"{url}\"{colors.ENDC} ({request[1:]}) " \
                            f"{colors.FAIL}[Possible directory brute force attack!]{colors.ENDC}"
     else:
-        # [date & time] [status code & message] source IP | url & HTTP method
+        # [date time] [code] ip | url request
         formatted_output = f"[{date} {time}] " \
                            f"{code_color}[{code}: {status_codes[code].upper()}]" \
                            f"{colors.ENDC} Source IP: {colors.HEADER}{colors.BOLD}{ip}{colors.ENDC} | " \
@@ -93,6 +83,22 @@ def callback(ch, method, properties, body):
     ansi_re = re.compile(r'\x1b\[[0-9;]*m')
     with open("output/formatted_output.log", "a") as file:
         file.write(re.sub(ansi_re, "", formatted_output) + "\n")
+
+
+# # Check if every element in the log buffer are identical.
+def is_directory_brute_force_attack(ip, code):
+    # Remove last element if buffer is full
+    if log_buffer.full():
+        log_buffer.get()
+
+    # Add element to buffer
+    log_buffer.put([ip, code])
+    log_buffer.task_done()
+
+    res = False
+    if log_buffer.full():
+        res = all(element == log_buffer.queue[0] for element in log_buffer.queue)
+    return res
 
 
 channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
