@@ -12,4 +12,4 @@ We have added an if statement and a log buffer. This will help us find any poten
 
 ### The terminal output with the malicious flag.
 
-(https://imgur.com/a/kKYlDAt)
+[img]https://i.imgur.com/uQy4G73.png[/img]
