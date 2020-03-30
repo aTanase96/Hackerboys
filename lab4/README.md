@@ -12,4 +12,4 @@ We have added an if statement and a log buffer. This will help us find any poten
 
 ### The terminal output with the malicious flag.
 
-[img]https://i.imgur.com/uQy4G73.png[/img]
+![404 error code](https://i.imgur.com/uQy4G73.png)
