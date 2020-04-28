@@ -1,9 +1,7 @@
 import java.nio.ByteBuffer;
+import java.security.*;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
 
 public class Transaction {
 
@@ -204,5 +202,20 @@ public class Transaction {
 
     public int numOutputs() {
         return outputs.size();
+    }
+
+    public void signTx(PrivateKey sk, int input) throws SignatureException {
+        Signature sig = null;
+        try {
+            sig = Signature.getInstance("SHA256withRSA");
+            sig.initSign(sk);
+            sig.update(this.getRawDataToSign(input));
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException(e);
+        }
+        this.addSignature(sig.sign(), input);
+        // Note that this method is incorrectly named, and should not in fact override the Java
+        // object finalize garbage collection related method.
+        this.finalize();
     }
 }
